@@ -1,53 +1,61 @@
-import tkinter as tk
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from PyQt5.QtCore import Qt
 
 
-class CellEditor:
+class CellEditor(QDialog):
     def __init__(self, parent, tree, current_df):
-        self.parent = parent
+        super().__init__(parent)
         self.tree = tree
         self.current_df = current_df
+        self.selected_item = None
+        self.col_index = None
 
-        # Пример добавления адаптивного размещения
-        self.parent.columnconfigure(0, weight=1)
-        self.parent.rowconfigure(0, weight=1)
-        self.tree.grid(sticky="nsew")
-    def edit_cell(self, event):
-        selected_item = self.tree.selection()
-        if not selected_item:
+        self.setWindowTitle("Редактирование ячейки")
+        self.setModal(True)
+        self.setup_ui()
+
+    def setup_ui(self):
+        """
+        Настраивает интерфейс окна редактирования.
+        """
+        layout = QVBoxLayout(self)
+
+        self.label = QLabel("Новое значение:")
+        layout.addWidget(self.label)
+
+        self.new_value_entry = QLineEdit()
+        layout.addWidget(self.new_value_entry)
+
+        self.save_button = QPushButton("Сохранить")
+        self.save_button.clicked.connect(self.save_new_value)
+        layout.addWidget(self.save_button)
+
+    def edit_cell(self, index):
+        """
+        Открывает окно редактирования для выбранной ячейки.
+        """
+        self.selected_item = index
+        self.col_index = index.column()
+
+        current_value = self.tree.model().data(index, Qt.DisplayRole)
+        self.new_value_entry.setText(current_value)
+
+        self.exec_()
+
+    def save_new_value(self):
+        """
+        Сохраняет новое значение в ячейке.
+        """
+        new_value = self.new_value_entry.text()
+
+        if not new_value:
+            QMessageBox.warning(self, "Ошибка", "Значение не может быть пустым.")
             return
 
-        selected_item = selected_item[0]
-        col = self.tree.identify_column(event.x)[1:]  # Определяем колонку
-        col_index = int(col) - 1  # Преобразуем номер колонки в индекс
-        current_value = self.tree.item(selected_item)["values"][col_index]
+        model = self.tree.model()
+        model.setData(self.selected_item, new_value, Qt.DisplayRole)
 
-        # Открываем окно редактирования
-        self.open_edit_window(selected_item, col_index, current_value)
+        row = self.selected_item.row()
+        self.current_df.iat[row, self.col_index] = new_value
 
-
-
-    def open_edit_window(self, selected_item, col_index, current_value):
-        edit_window = tk.Toplevel(self.parent)
-        edit_window.title("Редактирование ячейки")
-
-        tk.Label(edit_window, text="Новое значение:").pack(pady=5)
-
-        new_value_entry = tk.Entry(edit_window)
-        new_value_entry.pack(pady=5)
-        new_value_entry.insert(0, current_value)
-
-        def save_new_value():
-            new_value = new_value_entry.get()
-
-            # Обновляем данные в Treeview
-            self.tree.item(selected_item, values=[
-                new_value if i == col_index else val
-                for i, val in enumerate(self.tree.item(selected_item)["values"])
-            ])
-
-            # Обновляем данные в DataFrame
-            self.current_df.iat[int(selected_item[1:], 16) - 1, col_index] = new_value
-
-            edit_window.destroy()
-
-        tk.Button(edit_window, text="Сохранить", command=save_new_value).pack(pady=10)
+        self.accept()
