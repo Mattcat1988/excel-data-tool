@@ -1,4 +1,6 @@
-MyIcon.iconset
 dist
 build
 __pycache__
+.idea
+.venv
+.DS_Store
